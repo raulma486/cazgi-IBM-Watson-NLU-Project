@@ -1,33 +1,108 @@
 const express = require('express');
+const dotenv = require('dotenv');
 const app = new express();
+const cors_app = require('cors');
+
+dotenv.config();
+
+function getNULInstance(analyzeParams, text, emotion, res) {
+    let api_key = process.env.API_KEY;
+    let api_url = process.env.API_URL;
+
+    const NaturalLanguageUnderstandingV1 = require('ibm-watson/natural-language-understanding/v1');
+    const { IamAuthenticator } = require('ibm-watson/auth');
+
+    const naturalLanguageUnderstanding = new NaturalLanguageUnderstandingV1({
+        version: '2020-08-01',
+        authenticator: new IamAuthenticator({
+            apikey: api_key
+        }),
+        serviceUrl: api_url
+    });
+
+    // Se arma el parámetro a enviar a analizar
+    // Se determina de acuerdo a si es texto o url y emotion o sentiment
+    var analyzeParamsNLU = {};
+    if (text) {
+        analyzeParamsNLU = {
+            'text': analyzeParams,
+            'features': {
+                'keywords': {
+                    'emotion': emotion,
+                    'sentiment': !emotion,
+                    'limit': 5,
+                }
+            },
+        };
+    } else {
+        analyzeParamsNLU = {
+            'url': analyzeParams,
+            'features': {
+                'keywords': {
+                    'emotion': emotion,
+                    'sentiment': !emotion,
+                    'limit': 5,
+                },
+            },
+        };
+    }
+
+    // Analizar text o url
+    naturalLanguageUnderstanding.analyze(analyzeParamsNLU).then(data => {
+        //console.log(data.result.keywords.sort((a, b) => a.count < b.count ? 1: -1));
+        res.status(200);
+        if (data.result.keywords) {
+            var dataFilter = data.result.keywords.sort((a, b) => a.count < b.count ? 1 : -1)[0];
+            console.log(dataFilter);
+            if (emotion) {
+                if (dataFilter.emotion) {
+                    // Devuelve la información de las 5 emociones
+                    res.send(dataFilter.emotion);
+                } else {
+                    res.send('Without data');
+                }
+
+            } else {
+                if (dataFilter.sentiment.label) {
+                    // Devuelve la información del sentimiento
+                    res.send(dataFilter.sentiment.label);
+                } else {
+                    res.send('Without data');
+                }
+            }
+        } else {
+            res.send('Without data');
+        }
+    }).catch(error => {
+        res.status(500);
+        res.send(error);
+    });
+}
 
 app.use(express.static('client'))
 
-const cors_app = require('cors');
 app.use(cors_app());
 
-app.get("/",(req,res)=>{
+app.get("/", (req, res) => {
     res.render('index.html');
-  });
-
-app.get("/url/emotion", (req,res) => {
-
-    return res.send({"happy":"90","sad":"10"});
 });
 
-app.get("/url/sentiment", (req,res) => {
-    return res.send("url sentiment for "+req.query.url);
+app.get("/url/emotion", (req, res) => {
+    getNULInstance(req.query.url, false, true, res);
 });
 
-app.get("/text/emotion", (req,res) => {
-    return res.send({"happy":"10","sad":"90"});
+app.get("/url/sentiment", (req, res) => {
+    getNULInstance(req.query.url, false, false, res);
 });
 
-app.get("/text/sentiment", (req,res) => {
-    return res.send("text sentiment for "+req.query.text);
+app.get("/text/emotion", (req, res) => {
+    getNULInstance(req.query.text, true, true, res);
+});
+
+app.get("/text/sentiment", (req, res) => {
+    getNULInstance(req.query.text, true, false, res);
 });
 
 let server = app.listen(8080, () => {
     console.log('Listening', server.address().port)
 })
-
