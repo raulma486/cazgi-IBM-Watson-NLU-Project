@@ -20,8 +20,6 @@ function getNULInstance(analyzeParams, text, emotion, res) {
         serviceUrl: api_url
     });
 
-    // Se arma el parámetro a enviar a analizar
-    // Se determina de acuerdo a si es texto o url y emotion o sentiment
     var analyzeParamsNLU = {};
     if (text) {
         analyzeParamsNLU = {
@@ -46,10 +44,7 @@ function getNULInstance(analyzeParams, text, emotion, res) {
             },
         };
     }
-
-    // Analizar text o url
     naturalLanguageUnderstanding.analyze(analyzeParamsNLU).then(data => {
-        //console.log(data.result.keywords.sort((a, b) => a.count < b.count ? 1: -1));
         res.status(200);
         if (data.result.keywords) {
             var dataFilter = data.result.keywords.sort((a, b) => a.count < b.count ? 1 : -1)[0];
